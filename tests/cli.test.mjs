@@ -97,3 +97,24 @@ test('mapLimit preserves order', async () => {
   const out = await mapLimit([30, 1, 15, 2], 2, async (n) => { await new Promise((r) => setTimeout(r, n)); return n * 2; });
   assert.deepEqual(out, [60, 2, 30, 4]);
 });
+test('a throwing vetCandidate yields SS-08 for that candidate only', async () => {
+  const vet = async (c) => {
+    if (c.skillId === 's2') throw new Error('boom');
+    return { description: 'd', scannedFiles: 1, findings: [] };
+  };
+  const r = await run(['--query', 'q', '--top', '3'], { fetch: fakeFetch({ search: { q: [sk(1), sk(2), sk(3)] } }), env: {}, getGhToken: () => null, vet });
+  assert.equal(r.exitCode, 0);
+  const cs = JSON.parse(r.stdout).candidates;
+  assert.equal(cs.length, 3);
+  assert.deepEqual(cs[1].findings.map((f) => f.rule), ['SS-08']);
+  assert.equal(cs[1].scannedFiles, 0);
+  assert.deepEqual(Object.keys(cs[1]), Object.keys(cs[0]));
+  assert.equal(cs[0].scannedFiles, 1);
+  assert.equal(cs[2].scannedFiles, 1);
+});
+test('throwing getGhToken is treated as no token', async () => {
+  const calls = [];
+  const r = await go(['--query', 'q', '--top', '1'], { fetch: fakeFetch({ search: { q: [sk(1)] }, calls }), env: {}, getGhToken: () => { throw new Error('x'); } });
+  assert.equal(r.exitCode, 0);
+  assert.doesNotMatch(JSON.stringify(calls.find((c) => c.url.startsWith('https://api.github.com/')).headers), /Bearer|token/i);
+});

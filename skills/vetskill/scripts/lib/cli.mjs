@@ -1,6 +1,7 @@
 import { searchAll } from './search.mjs';
 import { vetCandidate, createTreeCache } from './fetch-skill.mjs';
 import { mapLimit } from './pool.mjs';
+import { MESSAGES } from './rules.mjs';
 
 const USAGE = `Usage: node scan.mjs --query <q> [--query <q> ...] [--top <n>]
 
@@ -38,7 +39,22 @@ function parseArgs(argv) {
   return { queries: clean, top };
 }
 
-export async function run(argv, { fetch, env, getGhToken }) {
+const FETCH_FAILED = () => ({
+  description: '',
+  scannedFiles: 0,
+  findings: [{ rule: 'SS-08', severity: 'info', file: '.', line: null, message: MESSAGES['SS-08:fetch-failed'] }],
+});
+
+function safeToken(env, getGhToken) {
+  if (env.GITHUB_TOKEN) return env.GITHUB_TOKEN;
+  try {
+    return getGhToken() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function run(argv, { fetch, env, getGhToken, vet = vetCandidate }) {
   const p = parseArgs(argv);
   if (p.help) return { stdout: USAGE, exitCode: 0 };
   if (p.error) return usageError(p.error);
@@ -47,10 +63,10 @@ export async function run(argv, { fetch, env, getGhToken }) {
   const found = await searchAll(p.queries, { fetch, apiBase });
   let candidates = [];
   if (!found.error) {
-    const token = env.GITHUB_TOKEN || getGhToken() || null;
+    const token = safeToken(env, getGhToken);
     const treeCache = createTreeCache();
     const top = found.candidates.slice(0, p.top);
-    const vetted = await mapLimit(top, 4, (c) => vetCandidate(c, { fetch, token, treeCache }));
+    const vetted = await mapLimit(top, 4, (c) => Promise.resolve().then(() => vet(c, { fetch, token, treeCache })).catch(FETCH_FAILED));
     candidates = top.map((c, i) => ({
       id: c.id,
       source: c.source,

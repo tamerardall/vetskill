@@ -1,7 +1,7 @@
 # vetskill — Tasarım
 
 - **Tarih:** 2026-10-29
-- **Durum:** Taslak, kullanıcı incelemesinde
+- **Durum:** Onaylandı (2026-10-29)
 - **Repo:** `tamerardall/vetskill` (MIT)
 
 ## 1. Amaç
@@ -56,6 +56,11 @@ vetskill/
 ```
 
 Kurulum: `npx skills add tamerardall/vetskill`. Node, `npx skills` için zaten gereklidir; ek kurulum yoktur.
+
+### SKILL.md kuralları
+- Frontmatter `description` "Use when…" ile başlar, yalnızca tetiklenme koşullarını anlatır (skill arama, "is there a skill for X", skill kurmadan önce güvenlik sorusu); süreci özetlemez. 500 karakterin altında.
+- Script her zaman yorumlayıcıyla çağrılır: `node scripts/scan.mjs …` (bazı paketleyiciler çalıştırma izinlerini siler).
+- Gövde 500 kelimenin altında; bayrak ayrıntıları `node scripts/scan.mjs --help` çıktısındadır.
 
 ### Neden script?
 Kötü niyetli bir SKILL.md'yi ajanın okuması, içindeki prompt injection'ı ajanın bağlamına sokar. Görünmez Unicode'u LLM güvenilir şekilde göremez. Bu yüzden ham içerik yalnızca script'te işlenir; ajan sadece script'in ürettiği JSON'u görür. SKILL.md, ajana aday dosyalarını kendisi `curl`/WebFetch ile okumamasını açıkça söyler.
@@ -129,7 +134,8 @@ Kötü niyetli bir SKILL.md'yi ajanın okuması, içindeki prompt injection'ı a
 - Gizli Unicode fixture'ları dosyaya ham yazılmaz; test sırasında escape dizilerinden üretilir.
 - Birleştirme testleri: RRF puanı, tekilleştirme, eşitlikte `installs`, kısmi sorgu hatası → `warnings`, tüm hata → `error` + çıkış 2.
 - İçerik çekme testleri: skill klasörü bulma (alt klasör, kök SKILL.md, bulunamadı), boyut/dosya sınırları, 403 → SS-08.
-- **Ajan senaryoları (elle):** "pdf'leri birleştir", "vercel'e deploy et", "commit mesajı yaz", "react performansını artır". Ölçüt: beklenen skill ilk 3 öneride; her öneride gerekçe ve tarama sonucu var.
+- **SKILL.md, RED-GREEN-REFACTOR ile yazılır (superpowers:writing-skills).** RED: skill olmadan subagent'lara senaryolar verilir, davranış kelimesi kelimesine kaydedilir (beklenen hatalar: `npx skills find` sıralamasına güvenmek, aday SKILL.md'leri doğrudan okumak, "güvenli" demek). GREEN: SKILL.md yalnızca gözlenen hataları hedefler; aynı senaryolar skill ile tekrar çalıştırılır. REFACTOR: yeni kaçamaklar kapatılır, tekrar test edilir.
+- **Ajan senaryoları:** "pdf'leri birleştir", "vercel'e deploy et", "commit mesajı yaz", "react performansını artır". Ölçüt: beklenen skill ilk 3 öneride; her öneride gerekçe ve tarama sonucu var.
 
 ## 9. Yayın ve görünürlük
 

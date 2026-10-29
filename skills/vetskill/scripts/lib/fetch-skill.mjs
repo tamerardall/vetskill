@@ -41,8 +41,11 @@ export async function vetCandidate(candidate, { fetch, token, treeCache }) {
   }
 
   let tree;
+  let truncated = false;
   try {
-    tree = (await loadTree(source, { fetch, token, treeCache })).tree;
+    const res = await loadTree(source, { fetch, token, treeCache });
+    tree = res.tree;
+    truncated = res.truncated === true;
     if (!Array.isArray(tree)) throw new Error('bad tree');
   } catch (e) {
     return empty([ss08(failKey(e), '.')]);
@@ -50,7 +53,8 @@ export async function vetCandidate(candidate, { fetch, token, treeCache }) {
 
   const blobs = tree.filter((t) => t.type === 'blob');
   const dir = findSkillDir(blobs, skillId);
-  if (dir === null) return empty([ss08('folder-not-found', '.')]);
+  const truncFinding = truncated ? [ss08('file-limit', '.')] : [];
+  if (dir === null) return empty([ss08('folder-not-found', '.'), ...truncFinding]);
 
   const prefix = dir ? `${dir}/` : '';
   const files = blobs
@@ -58,7 +62,7 @@ export async function vetCandidate(candidate, { fetch, token, treeCache }) {
     .map((b) => ({ rel: b.path.slice(prefix.length), size: b.size ?? 0 }))
     .sort((a, b) => (a.rel === 'SKILL.md' ? -1 : b.rel === 'SKILL.md' ? 1 : a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 
-  const findings = [];
+  const findings = [...truncFinding];
   let description = '';
   let scannedFiles = 0;
   let queued = 0;

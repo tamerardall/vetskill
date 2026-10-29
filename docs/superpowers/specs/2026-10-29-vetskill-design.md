@@ -1,81 +1,90 @@
-# vetskill — Tasarım
+# vetskill — Design
 
-- **Tarih:** 2026-10-29
-- **Durum:** Onaylandı (2026-10-29)
+- **Date:** 2026-10-29 (updated after the final review)
+- **Status:** Approved; implemented
 - **Repo:** `tamerardall/vetskill` (MIT)
 
-## 1. Amaç
+## 1. Purpose
 
-Kullanıcı kelimeyi tam bilmeden, doğal dille ihtiyacını anlatır ("pdf'leri birleştirmek istiyorum"). vetskill en uygun 2–3 skill'i gerekçesiyle önerir ve her birini kurmadan önce statik güvenlik taramasından geçirip bulguları gösterir. Kurulumu yapmaz; karar kullanıcıdadır.
+The user describes a need in plain language, without knowing the exact keyword ("I want to merge PDFs"). vetskill recommends the 2–3 best-fitting skills with reasons, and runs a static security scan on each one before it is installed, showing the findings. It never installs anything; the decision stays with the user.
 
-Tek cümle: **Doğru skill'i bul, kurmadan önce ne yaptığını gör.**
+In one sentence: **Find the right skill, see what it does before you install it.**
 
-Proje sahibinin hedefleri: açık kaynakta görünürlük ve Claude Code / agent skills ekosisteminde yer edinmek.
+## 2. Background and evidence
 
-## 2. Arka plan ve kanıt
+`npx skills find` (vercel-labs/skills, `src/find.ts`) delegates search to the skills.sh API (`/api/search`, Algolia fuzzy). The API returns results in relevance order; the CLI re-sorts them by install count. Measured effect (2026-10-29):
 
-`npx skills find` (vercel-labs/skills, `src/find.ts`) aramayı skills.sh API'sine (`/api/search`, Algolia fuzzy) devreder. API sonuçları alaka sırasıyla döner; CLI bunları kurulum sayısına göre yeniden sıralar. Ölçülen etki (2026-10-29):
+- `deploy`: the API's first result, `deploy-to-vercel`, drops to 17th of 20 in the CLI; the CLI's first result (`microsoft-foundry`) does not contain the query.
+- `pdf`: `docx` and `canvas-design` rise to positions 2–3.
 
-- `deploy`: API'nin 1. sonucu `deploy-to-vercel`, CLI'da 20 sonuç içinde 17. sıraya düşer; CLI'ın 1. sonucu (`microsoft-foundry`) sorguyu içermez.
-- `pdf`: `docx` ve `canvas-design` 2–3. sıraya çıkar.
+Upstream has open PRs for this (#2432, #2457, #1312). The API results carry no description field, so the CLI output forces a decision on names alone.
 
-Upstream'de bu sorun için açık PR'lar var (#2432, #2457, #1312); proje sahibi #2432'ye bu kanıtla yorum yazdı. API sonuçlarında açıklama (description) alanı yoktur, bu yüzden CLI çıktısı yalnızca isimle karar vermeye zorlar.
+### Alternatives
 
-### Rakipler
-
-| Skill | Ne yapar | vetskill'den farkı |
+| Skill / source | What it does | Difference from vetskill |
 |---|---|---|
-| `maverickemanuel/trusted-skill-scout` | `npx skills find` ile arar, kur | "Güven" = ≥100 kurulum ve ≥500 yıldız; içerik taranmaz; kurulum sayısına göre sıralar |
-| `affaan-m/ecc` → `skill-scout` | Yeni skill yazmadan önce benzerini arar | Amaç farklı; deterministik tarama yok |
+| `maverickemanuel/trusted-skill-scout` | Searches with `npx skills find`, installs | "Trust" = ≥100 installs and ≥500 stars; content is not scanned; sorts by installs |
+| `affaan-m/ecc` → `skill-scout` | Looks for an existing skill before writing a new one | Different goal; no deterministic scan |
+| skills.sh skill pages | Show third-party audits (Gen Agent Trust Hub, Socket, Snyk) | Badges, not per-file findings at decision time; an agent reading the page also reads untrusted content |
 
-vetskill'in iki farkı: **alaka sırasını korur ve çoklu sorguyu birleştirir**; **içeriği ajan görmeden deterministik bir script tarar.**
+vetskill's differences: **it keeps relevance order and fuses several queries**, and **a deterministic script scans the content so the agent never sees it.**
 
-## 3. Kapsam
+## 3. Scope
 
-### Kapsamda
-- Niyetten çoklu sorgu üretimi (ajan), skills.sh API araması, sonuç birleştirme (script).
-- GitHub kaynaklı skill'lerin klasör içeriğini çekme ve statik kurallarla tarama.
-- Ajana yalnızca temizlenmiş JSON verilmesi; ajanın 2–3 öneriyi gerekçe ve bulgularla sunması.
+### In scope
+- Multi-query generation from intent (agent), skills.sh API search, result fusion (script).
+- Fetching the folder contents of GitHub-hosted skills and scanning them with static rules.
+- Giving the agent only sanitized JSON; the agent presents 2–3 recommendations with reasons and findings.
 
-### Kapsam dışı
-- Kurulum (`npx skills add` komutu yalnızca gösterilir).
-- AST / veri akışı analizi, script çalıştırma, sandbox.
-- GitHub dışı kaynaklar (well-known, HuggingFace vb.). Bu adaylar listelenir ama SS-08 "desteklenmeyen kaynak" bulgusuyla taranmamış olarak işaretlenir.
-- Ayrı npm paketi / bağımsız CLI dağıtımı.
+### Out of scope
+- Installation (the `npx skills add` command is only shown).
+- AST / data-flow analysis, running scripts, sandboxing.
+- Non-GitHub sources (well-known, HuggingFace, …). Search results whose `source` is not a GitHub `owner/repo` are dropped (see §5 step 2).
+- A separate npm package / standalone CLI distribution.
 
-## 4. Mimari
+## 4. Architecture
 
 ```
 vetskill/
 ├── skills/vetskill/
-│   ├── SKILL.md            # ajan talimatları
-│   └── scripts/scan.mjs    # bağımlılıksız, Node 18+ (yerleşik fetch)
-├── tests/                  # node:test
-├── docs/superpowers/specs/
+│   ├── SKILL.md              # agent instructions
+│   └── scripts/
+│       ├── scan.mjs          # thin entry point
+│       └── lib/              # cli, pool, search, http, fetch-skill, rules, frontmatter
+├── tests/                    # node:test
+├── docs/baseline/            # RED / GREEN agent-behaviour records
+├── docs/superpowers/         # spec and plan
 ├── README.md, README.tr.md, LICENSE
 ```
 
-Kurulum: `npx skills add tamerardall/vetskill`. Node, `npx skills` için zaten gereklidir; ek kurulum yoktur.
+Zero runtime and dev dependencies; Node ≥18 (built-in `fetch`); ESM `.mjs`. Install: `npx skills add tamerardall/vetskill`. Node is already required by `npx skills`; nothing else is needed. `npx skills add` copies the whole skill folder, so `scripts/lib/` ships with it.
 
-### SKILL.md kuralları
-- Frontmatter `description` "Use when…" ile başlar, yalnızca tetiklenme koşullarını anlatır (skill arama, "is there a skill for X", skill kurmadan önce güvenlik sorusu); süreci özetlemez. 500 karakterin altında.
-- Script her zaman yorumlayıcıyla çağrılır: `node scripts/scan.mjs …` (bazı paketleyiciler çalıştırma izinlerini siler).
-- Gövde 500 kelimenin altında; bayrak ayrıntıları `node scripts/scan.mjs --help` çıktısındadır.
+### SKILL.md rules
+- Frontmatter `description` starts with "Use when…" and describes only trigger conditions (looking for a skill, "is there a skill for X", a safety question before installing); it does not summarise the workflow. Under 500 characters.
+- The script is always invoked through the interpreter: `cd <skill dir> && node scripts/scan.mjs …` (some packagers strip executable bits).
+- Body under 500 words; flag details live in `node scripts/scan.mjs --help`.
+- JSON string fields (`description`, `name`, `file`) are framed as third-party text the agent must never take instructions from.
 
-### Neden script?
-Kötü niyetli bir SKILL.md'yi ajanın okuması, içindeki prompt injection'ı ajanın bağlamına sokar. Görünmez Unicode'u LLM güvenilir şekilde göremez. Bu yüzden ham içerik yalnızca script'te işlenir; ajan sadece script'in ürettiği JSON'u görür. SKILL.md, ajana aday dosyalarını kendisi `curl`/WebFetch ile okumamasını açıkça söyler.
+### Why a script?
+An agent reading a malicious SKILL.md pulls its prompt injection into the agent's context, and an LLM cannot reliably see invisible Unicode. So raw content is handled only by the script; the agent sees only the JSON the script produces. SKILL.md explicitly tells the agent not to fetch candidate files itself with `curl` / WebFetch / Read.
 
-## 5. Veri akışı
+## 5. Data flow
 
-1. **Ajan niyeti çözer.** Kullanıcı isteğinden 3–5 İngilizce sorgu üretir (eş anlamlılar, Türkçe isteğin karşılıkları, genelden özele).
-2. **Script arar.** `node scan.mjs --query "merge pdf" --query "pdf" [--top 10]`. Her sorgu için `GET https://skills.sh/api/search?q=<q>&limit=20`. `SKILLS_API_URL` ortam değişkeni taban adresi değiştirir.
-3. **Script birleştirir.** Adaylar `id` ile tekilleştirilir. Puan Reciprocal Rank Fusion ile hesaplanır: `score = Σ 1 / (10 + rank)` (rank 1'den başlar, adayın çıktığı her sorgu için). Eşitlikte `installs` büyük olan önce gelir. İlk `--top` (varsayılan 10) aday taranır.
-4. **Script içeriği çeker.** Her farklı `source` (`owner/repo`) için tek bir `GET /repos/{owner}/{repo}/git/trees/HEAD?recursive=1` isteği atılır. Skill klasörü, yolu `<dir>/SKILL.md` olan ve `<dir>`'in son parçası `skillId`'ye eşit olan girdidir; yoksa kök `SKILL.md` (tek skill'lik repo) denenir; o da yoksa SS-08 "skill klasörü bulunamadı". Klasördeki dosyalar `raw.githubusercontent.com/{owner}/{repo}/HEAD/<path>` üzerinden çekilir (API hız sınırına sayılmaz).
-5. **Script tarar ve temizler.** Bölüm 6'daki kurallar her dosyada çalışır. `description` frontmatter'dan okunur, görünmez/kontrol karakterleri silinir, 300 karaktere kısaltılır.
-6. **Script JSON yazar** (stdout, bkz. 5.1). Çıkış kodu: başarıda 0, arama tamamen başarısızsa 2, kullanım hatasında 1.
-7. **Ajan sıralar ve sunar.** JSON'daki açıklamalara göre niyete en uygun 2–3 adayı seçer. Her biri için: ad, kaynak, kurulum sayısı, neden uygun olduğu (1–2 cümle), bulgular (önem + kural + dosya:satır + ajan yorumu), `npx skills add <source>@<name>` komutu. Bulgu yoksa "taranan dosyalarda bulgu yok" der, asla "güvenli" demez.
+1. **The agent interprets intent.** It derives 3–5 English queries from the request (synonyms, English equivalents of non-English requests, general to specific).
+2. **The script searches.** `node scripts/scan.mjs --query "merge pdf" --query "pdf" [--top 10]`. For each distinct query: `GET https://skills.sh/api/search?q=<q>&limit=20`. The `SKILLS_API_URL` environment variable overrides the base (trailing slashes stripped). Each result item is validated before use: `id` matches `^[A-Za-z0-9._/-]{1,200}$`, `source` matches `^(?![.-])[\w.-]+\/(?![.-])[\w.-]+$`, `skillId` and `name` match `^(?!-)[A-Za-z0-9._-]{1,100}$`. Invalid items are dropped but keep their rank position (ranks are not renumbered). A leading dash is rejected because `source` and `name` end up in the suggested install command.
+3. **The script fuses results.** Candidates are deduplicated by `id`. Score uses Reciprocal Rank Fusion: `score = Σ 1 / (10 + rank)` (rank is 1-based, summed over every query the candidate appears in). Ties go to higher `installs`, then `id` ascending. The first `--top` (default 10, range 1–20) candidates are scanned.
+4. **The script fetches content.** One `GET /repos/{owner}/{repo}/git/trees/HEAD?recursive=1` per distinct `source` (the promise is cached, including rejections). The skill folder is resolved in this order:
+   1. a `<dir>/SKILL.md` whose last `<dir>` segment equals `skillId` (shortest path wins);
+   2. otherwise, `<dir>/SKILL.md` files whose last segment is a substring of `skillId`: up to 10 are fetched and the one whose frontmatter `name` equals `skillId` wins (real case: `vercel-react-best-practices` lives in `skills/react-best-practices/`);
+   3. otherwise, the root `SKILL.md`, but only when it is the only `SKILL.md` in the tree or its frontmatter `name` equals `skillId`;
+   4. otherwise, SS-08 "skill folder was not found".
 
-### 5.1 JSON çıktısı
+   Files are fetched from `raw.githubusercontent.com/{owner}/{repo}/HEAD/<path>` (not counted against the API rate limit). `SKILL.md` first, then path order; at most 30 files, at most 256 KB each (from the tree `size`, skipped without fetching). A tree with `truncated: true` adds an SS-08 finding.
+5. **The script scans and sanitizes.** The rules in §6 run on every file. `description` is read from frontmatter, ANSI and control characters and the SS-01 characters are removed, whitespace is collapsed, and it is cut to 300 characters. Every `finding.file` goes through `sanitizePath`: characters outside `[A-Za-z0-9._/@+ -]` become `?`, capped at 200 characters.
+6. **The script writes JSON** (stdout, see 5.1). Exit codes: 0 success, 2 all queries failed, 1 usage error (plain text, not JSON).
+7. **The agent ranks and presents.** It picks the 2–3 candidates whose `description` best fits the intent (candidates with `scannedFiles: 0` are listed separately as not scanned). For each: name, source, installs, why it fits (1–2 sentences), findings (severity · rule · file:line · interpretation), and the `npx skills add <source>@<name>` command. With no non-SS-08 findings it writes "No findings in scanned files" and never calls a skill safe.
+
+### 5.1 JSON output
 
 ```json
 {
@@ -88,64 +97,67 @@ Kötü niyetli bir SKILL.md'yi ajanın okuması, içindeki prompt injection'ı a
       "source": "anthropics/skills",
       "name": "pdf",
       "installs": 123456,
-      "score": 0.18,
+      "score": 0.1818,
       "matchedQueries": ["merge pdf", "pdf"],
       "description": "…",
       "scannedFiles": 4,
       "findings": [
-        { "rule": "SS-03", "severity": "medium", "file": "scripts/x.py", "line": 12, "message": "reads ~/.ssh" }
+        { "rule": "SS-03", "severity": "medium", "file": "scripts/x.py", "line": 12, "message": "reads SSH key, cloud credential, browser data or .env paths" }
       ]
     }
   ]
 }
 ```
 
-`error` yalnızca tüm sorgular başarısız olduğunda doludur (ör. `"search API unreachable: timeout"`); bu durumda `candidates` boştur. Bazı sorgular başarısızsa diğerlerinin sonuçları döner ve `warnings` dizisi başarısız sorguları listeler.
+`error` is set only when every query fails (e.g. `"search API unreachable: <reason>"`); `candidates` is then empty. When some queries fail, the others' results are returned and `warnings` lists the failed queries. `skillId` is internal and not part of the output.
 
-## 6. Güvenlik kuralları
+## 6. Security rules
 
-| ID | Ne arar | Önem |
+| ID | Looks for | Severity |
 |---|---|---|
-| SS-01 | Bidi kontrol (U+202A–202E, U+2066–2069) ve Unicode tag karakterleri (U+E0000–E007F): yüksek. Sıfır genişlikli (U+200B–200D, U+2060, dosya başı dışındaki U+FEFF): orta | yüksek / orta |
-| SS-02 | `curl`/`wget` çıktısının `sh`/`bash`/`zsh`'e aktarılması, `eval "$(curl …)"`, `iex (iwr …)` / `Invoke-Expression` + indirme | yüksek |
-| SS-03 | `~/.ssh`, `id_rsa`, `id_ed25519`, `~/.aws/credentials`, `.env`, tarayıcı çerez/profil dizinleri, macOS keychain | orta |
-| SS-04 | Ham IP adresine HTTP istekleri; `webhook.site`, `ngrok`, `pastebin.com`, `discord.com/api/webhooks`, `requestbin` | orta |
-| SS-05 | Prompt injection kalıpları: "ignore (all )?previous instructions", "do not tell the user", "without asking the user", "disregard (the )?system prompt" (büyük/küçük harf duyarsız) | orta |
-| SS-06 | 200+ karakterlik base64 blokları, `eval(atob(`, `exec(base64`, `base64 -d \| sh` | orta |
-| SS-07 | Frontmatter `allowed-tools` içinde kısıtsız `Bash` veya `*` | bilgi |
-| SS-08 | Taranamayan içerik: ikili dosya, 256 KB üstü dosya, skill başına 30 dosya sınırını aşan kısım, çekilemeyen dosya, desteklenmeyen kaynak, hız sınırı | bilgi |
+| SS-01 | Bidi controls (U+202A–202E, U+2066–2069) and Unicode tag characters (U+E0000–E007F): high. Zero-width (U+200B–200D, U+2060, U+FEFF not at file start): medium | high / medium |
+| SS-02 | `curl`/`wget` piped into `sh`/`bash`/`zsh` (optionally through `sudo` with flags), `bash <(curl …)`, `sh -c "$(curl …)"`, `eval "$(curl …)"`, `iex (iwr …)` / `Invoke-Expression` + download | high |
+| SS-03 | `~/.ssh`, `id_rsa`, `id_ed25519`, `.aws/credentials`, browser stores (`Login Data`, `cookies.sqlite`, case-sensitive `/Cookies`), macOS keychain — in every file; `.env` — only in non-Markdown files | medium |
+| SS-04 | HTTP requests to raw public IP addresses (not `127.*`, `0.0.0.0`); `webhook.site`, `ngrok`, `pastebin.com`, Discord webhooks, `requestbin`, `pipedream.net` | medium |
+| SS-05 | Prompt-injection phrases: "ignore (all) previous/prior/above instructions", "disregard the system prompt", "do not tell the user", "without asking/telling the user" (case-insensitive, any whitespace) | medium |
+| SS-06 | Runs of 200+ base64 characters, `eval(atob(`, `exec(base64`, `base64 -d … \| sh` | medium |
+| SS-07 | Unrestricted `Bash` or `*` in frontmatter `allowed-tools` | info |
+| SS-08 | What could not be scanned: binary file, file over 256 KB, files beyond the 30-file limit, truncated tree, file or skill that could not be fetched, skill folder not found, rate limit | info |
 
-İlkeler:
-- Araç hiçbir zaman "güvenli" demez. Statik tarama kararlı bir saldırganı yakalayamaz; bu sınır README'de yazılıdır.
-- Her bulgu dosya, satır ve kural ID'si taşır. Ajan bağlamı yorumlayabilir (ör. deploy skill'inde `.env` beklenir) ama bulguyu gizlemez.
-- Bulgu mesajları sabit metinlerdir; dosyadan alıntı içermez (injection'ın JSON üzerinden ajana sızmaması için).
+Principles:
+- The tool never says "safe". Static scanning cannot catch a determined attacker; the README states this limit.
+- Every finding carries file, line and rule ID. The agent may interpret context (a deploy skill is expected to mention `.env`) but never hides a finding.
+- Finding messages are fixed strings and never quote file content, so injection cannot travel to the agent through the JSON.
+- Every quantifier that scans along a line is bounded. Lines longer than 4096 characters skip the SS-02, SS-04, SS-05 and SS-06 regexes (SS-01, SS-03 and a linear long-base64 check still run). This prevents catastrophic backtracking on hostile input; the trade-off (padding a line past 4096 characters hides those rules) is listed in the README limits.
 
-## 7. Hata durumları
+## 7. Error handling
 
-- **Arama başarısız ≠ sonuç yok.** Tüm sorgular başarısızsa `error` dolar, çıkış kodu 2; ajan "arama servisine ulaşılamadı" der.
-- **Zaman aşımı:** her istek `AbortSignal.timeout(10_000)`. **Eşzamanlılık:** en fazla 4 istek aynı anda.
-- **GitHub kimlik doğrulaması:** `GITHUB_TOKEN` ortam değişkeni, yoksa `gh auth token` çıktısı, o da yoksa token'sız (saatte 60 istek). 403/429'da etkilenen adaylar SS-08 "hız sınırı" ile işaretlenir, listeden çıkarılmaz; ajan `gh auth login` önerir.
-- **Kısmi hatalar işi durdurmaz;** her aday bağımsız işlenir.
+- **A failed search is not "no results".** If every query fails, `error` is set and the exit code is 2; the agent says the search service was unreachable.
+- **Timeouts:** every request uses `AbortSignal.timeout(10_000)`. **Concurrency:** at most 4 candidates are vetted at once.
+- **GitHub authentication:** `GITHUB_TOKEN` env var, else `gh auth token` output (3 s timeout), else no token (60 requests per hour). The token is sent only to `api.github.com`. On 403/429 the affected candidates get an SS-08 rate-limit finding and stay in the list; the agent suggests `gh auth login`.
+- **Partial failures do not stop the run;** each candidate is isolated, and an unexpected failure becomes an SS-08 "could not fetch the skill" finding for that candidate only.
 
-## 8. Test
+## 8. Testing
 
-- `node --test`; dış bağımlılık yok. `fetch` fonksiyonu enjekte edilir, testlerde ağ çağrısı yapılmaz.
-- Her kural için **kötü** (yakalanmalı) ve **masum** (yakalanmamalı) fixture: ör. deploy dokümanında `.env`'den bahsetme, README'de normal `curl -O` kurulum adımı, kısa base64 sabit.
-- Gizli Unicode fixture'ları dosyaya ham yazılmaz; test sırasında escape dizilerinden üretilir.
-- Birleştirme testleri: RRF puanı, tekilleştirme, eşitlikte `installs`, kısmi sorgu hatası → `warnings`, tüm hata → `error` + çıkış 2.
-- İçerik çekme testleri: skill klasörü bulma (alt klasör, kök SKILL.md, bulunamadı), boyut/dosya sınırları, 403 → SS-08.
-- **SKILL.md, RED-GREEN-REFACTOR ile yazılır (superpowers:writing-skills).** RED: skill olmadan subagent'lara senaryolar verilir, davranış kelimesi kelimesine kaydedilir (beklenen hatalar: `npx skills find` sıralamasına güvenmek, aday SKILL.md'leri doğrudan okumak, "güvenli" demek). GREEN: SKILL.md yalnızca gözlenen hataları hedefler; aynı senaryolar skill ile tekrar çalıştırılır. REFACTOR: yeni kaçamaklar kapatılır, tekrar test edilir.
-- **Ajan senaryoları:** "pdf'leri birleştir", "vercel'e deploy et", "commit mesajı yaz", "react performansını artır". Ölçüt: beklenen skill ilk 3 öneride; her öneride gerekçe ve tarama sonucu var.
+- `node --test`; no external dependencies. `fetch` is injected, so tests make no network calls.
+- Every rule has **bad** (must be caught) and **benign** (must not be caught) fixtures, e.g. a deploy doc mentioning `.env`, a normal `curl -O` install step, a short base64 constant.
+- Hidden-Unicode fixtures are never written raw to disk; they are built from escape sequences at test time. A test asserts the scanner's own sources contain no SS-01 characters.
+- Pathological inputs (`'curl '.repeat(50000)`, `'iex '.repeat(60000)`) must scan in under 500 ms.
+- Fusion tests: RRF score, deduplication, install tie-break, partial query failure → `warnings`, total failure → `error` + exit 2, field validation.
+- Fetch tests: folder resolution (nested, name fallback, root, not found), size/file limits, truncated tree, 403 → SS-08, path sanitization.
+- **SKILL.md is written with RED-GREEN-REFACTOR (superpowers:writing-skills).** RED: scenarios run by subagents without the skill, behaviour recorded verbatim (`docs/baseline/2026-10-29-red.md`). GREEN: SKILL.md targets only the observed failures; the same scenarios are re-run with the skill, plus a 5-rep skill vs control comparison (`docs/baseline/2026-10-29-green.md`). REFACTOR: loopholes closed and re-tested.
+- **Agent scenarios:** merge PDFs, deploy to Vercel, write commit messages, improve React performance, scrape websites without credential risk. Pass: expected skill in the top 3; each recommendation has a reason and a scan result.
 
-## 9. Yayın ve görünürlük
+## 9. Release and visibility
 
-- README girişi: `deploy` önce/sonra örneği (CLI'da 17. sıra → vetskill'de ilk öneri + tarama raporu), "Neden başka bir araç?" bölümü (Bölüm 2 rakip tablosu), kural tablosu, sınırlar.
-- `README.tr.md` Türkçe karşılık.
-- Dışa dönük adımlar ayrıca onay gerektirir: GitHub repo oluşturma/push, #2432 tartışmasına bağlantı, LinkedIn duyurusu.
+- README opens with the `deploy` before/after (17th in the CLI → first vetskill recommendation with its scan report), a "Why another tool?" section (the §2 table), the rules table, and limits.
+- `README.tr.md` is the Turkish equivalent.
+- The README does not name third-party skills together with specific findings; a static match may be legitimate.
+- Outward-facing steps need separate approval: creating/pushing the GitHub repo, linking from the #2432 discussion, a LinkedIn announcement.
 
-## 10. Başarı ölçütleri
+## 10. Success criteria
 
-1. Bölüm 8'deki dört senaryonun her birinde beklenen skill ilk 3 öneride.
-2. Her kuralın kötü fixture'ı yakalanıyor, masum fixture'ı yakalanmıyor.
-3. Ajan hiçbir adımda aday dosyalarının ham içeriğini okumuyor.
-4. `npx skills add tamerardall/vetskill` ile kurulup ek adım olmadan çalışıyor.
+1. In each §8 scenario the expected skill is in the top 3 recommendations.
+2. Every rule's bad fixture is caught and its benign fixture is not.
+3. The agent never reads raw candidate file content at any step.
+4. It installs with `npx skills add tamerardall/vetskill` and works with no extra steps.

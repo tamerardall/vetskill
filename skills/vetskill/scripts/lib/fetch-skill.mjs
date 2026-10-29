@@ -24,14 +24,40 @@ function loadTree(source, { fetch, token, treeCache }) {
   return treeCache.get(source);
 }
 
-function findSkillDir(blobs, skillId) {
-  const dirs = blobs
-    .filter((b) => b.path.endsWith('/SKILL.md'))
-    .map((b) => b.path.slice(0, -'/SKILL.md'.length))
-    .filter((d) => d.split('/').pop() === skillId)
-    .sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
-  if (dirs.length) return dirs[0];
-  return blobs.some((b) => b.path === 'SKILL.md') ? '' : null;
+const rawUrl = (source, path) =>
+  `https://raw.githubusercontent.com/${source}/HEAD/${path.split('/').map(encodeURIComponent).join('/')}`;
+const byLengthThenPath = (a, b) => a.length - b.length || (a < b ? -1 : 1);
+const skillDirs = (blobs) =>
+  blobs.filter((b) => b.path.endsWith('/SKILL.md')).map((b) => ({ dir: b.path.slice(0, -'/SKILL.md'.length), size: b.size ?? 0 }));
+
+// Returns { dir, skillMd } where skillMd is already-fetched SKILL.md text (or null), or null if no folder.
+async function findSkillDir(blobs, skillId, source, fetch) {
+  const all = skillDirs(blobs);
+  const exact = all.map((d) => d.dir).filter((d) => d.split('/').pop() === skillId).sort(byLengthThenPath);
+  if (exact.length) return { dir: exact[0], skillMd: null };
+
+  const cands = all
+    .filter((d) => d.size <= MAX_BYTES)
+    .filter((d) => {
+      const last = d.dir.split('/').pop();
+      return last && skillId.includes(last);
+    })
+    .sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0))
+    .slice(0, 10);
+  const matches = [];
+  for (const c of cands) {
+    try {
+      const text = await getText(fetch, rawUrl(source, `${c.dir}/SKILL.md`));
+      if (parseFrontmatter(text).name === skillId) matches.push({ dir: c.dir, skillMd: text });
+    } catch {
+      // treated as non-matching
+    }
+  }
+  if (matches.length) {
+    matches.sort((a, b) => byLengthThenPath(a.dir, b.dir));
+    return matches[0];
+  }
+  return blobs.some((b) => b.path === 'SKILL.md') ? { dir: '', skillMd: null } : null;
 }
 
 export async function vetCandidate(candidate, { fetch, token, treeCache }) {
@@ -52,10 +78,11 @@ export async function vetCandidate(candidate, { fetch, token, treeCache }) {
   }
 
   const blobs = tree.filter((t) => t.type === 'blob');
-  const dir = findSkillDir(blobs, skillId);
+  const found = await findSkillDir(blobs, skillId, source, fetch);
   const truncFinding = truncated ? [ss08('file-limit', '.')] : [];
-  if (dir === null) return empty([ss08('folder-not-found', '.'), ...truncFinding]);
+  if (found === null) return empty([ss08('folder-not-found', '.'), ...truncFinding]);
 
+  const { dir, skillMd } = found;
   const prefix = dir ? `${dir}/` : '';
   const files = blobs
     .filter((b) => b.path.startsWith(prefix))
@@ -78,10 +105,9 @@ export async function vetCandidate(candidate, { fetch, token, treeCache }) {
       findings.push(ss08('too-large', f.rel));
       continue;
     }
-    const url = `https://raw.githubusercontent.com/${source}/HEAD/${(prefix + f.rel).split('/').map(encodeURIComponent).join('/')}`;
     let text;
     try {
-      text = await getText(fetch, url);
+      text = f.rel === 'SKILL.md' && skillMd !== null ? skillMd : await getText(fetch, rawUrl(source, prefix + f.rel));
     } catch (e) {
       findings.push(ss08(failKey(e), f.rel));
       continue;

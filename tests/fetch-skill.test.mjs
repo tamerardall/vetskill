@@ -201,3 +201,36 @@ test('rejects unsupported source', async () => {
   assert.equal(r.findings[0].rule, 'SS-08');
   assert.match(r.findings[0].message, /not supported/);
 });
+const named = (n) => `---\nname: ${n}\ndescription: d ${n}\n---\nbody\n`;
+test('falls back to frontmatter name match', async () => {
+  const r = await run(cand('o/r', 'vercel-react-best-practices'), {
+    trees: { 'o/r': { tree: [blob('skills/best-practices/SKILL.md'), blob('skills/react-best-practices/SKILL.md'), blob('skills/react-best-practices/rules/a.md'), blob('skills/best-practices/x.md')] } },
+    raw: {
+      'o/r/skills/best-practices/SKILL.md': named('other'),
+      'o/r/skills/react-best-practices/SKILL.md': named('vercel-react-best-practices'),
+      'o/r/skills/react-best-practices/rules/a.md': 'rule',
+    },
+  });
+  assert.equal(r.scannedFiles, 2);
+  assert.equal(r.description, 'd vercel-react-best-practices');
+  assert.ok(!r.calls.some((c) => c.url.includes('x.md')));
+  assert.equal(r.calls.filter((c) => c.url.endsWith('react-best-practices/SKILL.md')).length, 1);
+});
+test('fallback ignores folders whose name does not match', async () => {
+  const r = await run(cand('o/r', 'vercel-react-best-practices'), {
+    trees: { 'o/r': { tree: [blob('skills/react-best-practices/SKILL.md')] } },
+    raw: { 'o/r/skills/react-best-practices/SKILL.md': named('something-else') },
+  });
+  assert.equal(r.scannedFiles, 0);
+  assert.match(r.findings[0].message, /not found/);
+});
+test('fallback fetches at most 10 SKILL.md files', async () => {
+  const tree = [], raw = {};
+  for (let i = 0; i < 15; i++) {
+    const d = `s/p${String(i).padStart(2, '0')}`;
+    tree.push(blob(`${d}/SKILL.md`));
+    raw[`o/r/${d}/SKILL.md`] = named('nope');
+  }
+  const r = await run(cand('o/r', 'p00p01p02p03p04p05p06p07p08p09p10p11p12p13p14'), { trees: { 'o/r': { tree } }, raw });
+  assert.equal(r.calls.filter((c) => c.url.startsWith('https://raw.')).length, 10);
+});

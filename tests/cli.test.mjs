@@ -118,3 +118,9 @@ test('throwing getGhToken is treated as no token', async () => {
   assert.equal(r.exitCode, 0);
   assert.doesNotMatch(JSON.stringify(calls.find((c) => c.url.startsWith('https://api.github.com/')).headers), /Bearer|token/i);
 });
+test('candidates with unsafe search fields never reach the output', async () => {
+  const bad = { ...sk(9), name: 'x; rm -rf ~ #' };
+  const r = await go(['--query', 'q'], { fetch: fakeFetch({ search: { q: [bad, sk(1)] } }) });
+  assert.doesNotMatch(r.stdout, /rm -rf/);
+  assert.deepEqual(JSON.parse(r.stdout).candidates.map((c) => c.name), ['s1']);
+});

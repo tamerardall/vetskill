@@ -2,9 +2,14 @@ import { getJson, getText, HttpError } from './http.mjs';
 import { MESSAGES, scanText } from './rules.mjs';
 import { parseFrontmatter, scanFrontmatter, sanitizeDescription } from './frontmatter.mjs';
 
-const SOURCE_RE = /^[\w.-]+\/[\w.-]+$/;
+export const SOURCE_RE = /^[\w.-]+\/[\w.-]+$/;
 const MAX_BYTES = 262144;
 const MAX_FILES = 30;
+
+// Tree paths are third-party text: keep only a conservative character set before they reach the JSON.
+export function sanitizePath(p) {
+  return String(p).replace(/[^A-Za-z0-9._/@+ -]/g, '?').slice(0, 200);
+}
 
 export function createTreeCache() {
   return new Map();
@@ -60,7 +65,12 @@ async function findSkillDir(blobs, skillId, source, fetch) {
   return blobs.some((b) => b.path === 'SKILL.md') ? { dir: '', skillMd: null } : null;
 }
 
-export async function vetCandidate(candidate, { fetch, token, treeCache }) {
+export async function vetCandidate(candidate, ctx) {
+  const r = await vetUnsanitized(candidate, ctx);
+  return { ...r, findings: r.findings.map((f) => ({ ...f, file: sanitizePath(f.file) })) };
+}
+
+async function vetUnsanitized(candidate, { fetch, token, treeCache }) {
   const { source, skillId } = candidate;
   if (typeof source !== 'string' || !SOURCE_RE.test(source)) {
     return empty([ss08('unsupported-source', '.')]);

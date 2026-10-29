@@ -75,3 +75,12 @@ test('MESSAGES has all keys', () => {
     assert.equal(typeof MESSAGES[k], 'string', k);
   }
 });
+
+test('scanner source files contain no hidden Unicode', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const f of ['rules.mjs', 'frontmatter.mjs']) {
+    const url = new URL(`../skills/vetskill/scripts/lib/${f}`, import.meta.url);
+    const found = scanText(f, readFileSync(url, 'utf8')).filter((x) => x.rule === 'SS-01');
+    assert.deepEqual(found, [], f);
+  }
+});

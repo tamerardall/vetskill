@@ -39,3 +39,9 @@ test('sanitizeDescription strips hidden unicode', () =>
   assert.equal(sanitizeDescription('a' + String.fromCodePoint(0x202e, 0xe0041, 0x200b) + 'b\x85c'), 'abc'));
 test('sanitizeDescription cuts to 300', () => assert.equal(sanitizeDescription('x'.repeat(500)).length, 300));
 test('sanitizeDescription(null)', () => assert.equal(sanitizeDescription(null), ''));
+
+test('parses unindented allowed-tools list', () => {
+  const fm = parseFrontmatter(doc('allowed-tools:\n- Read\n- Bash'));
+  assert.deepEqual(fm.allowedTools, ['Read', 'Bash']);
+  assert.equal(scanFrontmatter('SKILL.md', fm)[0].rule, 'SS-07');
+});

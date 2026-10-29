@@ -16,9 +16,9 @@ export const MESSAGES = {
 };
 
 // Bidi controls and Unicode tag characters: high. Zero-width and joiners: medium.
-export const HIGH_CHARS = /[‪-‮⁦-⁩\u{E0000}-\u{E007F}]/u;
-export const MEDIUM_CHARS = /[​-‍⁠᠎﻿]/u;
-export const ALL_HIDDEN_CHARS = /[‪-‮⁦-⁩\u{E0000}-\u{E007F}​-‍⁠᠎﻿]/gu;
+export const HIGH_CHARS = /[\u{202A}-\u{202E}\u{2066}-\u{2069}\u{E0000}-\u{E007F}]/u;
+export const MEDIUM_CHARS = /[\u{200B}-\u{200D}\u{2060}\u{FEFF}]/u;
+export const ALL_HIDDEN_CHARS = /[\u{202A}-\u{202E}\u{2066}-\u{2069}\u{E0000}-\u{E007F}\u{200B}-\u{200D}\u{2060}\u{FEFF}]/gu;
 
 const SS02 = [
   /\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(ba|z)?sh\b/i,
@@ -63,7 +63,7 @@ export function scanText(path, text) {
 
   lines.forEach((raw, i) => {
     const n = i + 1;
-    const line = n === 1 && raw.startsWith('﻿') ? raw.slice(1) : raw;
+    const line = n === 1 && raw.startsWith('\u{FEFF}') ? raw.slice(1) : raw;
 
     if (HIGH_CHARS.test(line)) add('SS-01', 'high', n);
     else if (MEDIUM_CHARS.test(line)) add('SS-01', 'medium', n);

@@ -24,7 +24,7 @@ function splitTools(s) {
 
 export function parseFrontmatter(text) {
   const result = { name: null, description: null, allowedTools: [] };
-  const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
+  const lines = text.replace(/^\u{FEFF}/u, '').split(/\r\n|\r|\n/);
   if (lines[0]?.trim() !== '---') return result;
   const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
   if (end === -1) return result;
@@ -38,7 +38,10 @@ export function parseFrontmatter(text) {
 
     // Collect indented continuation lines (block scalar body or YAML list).
     const cont = [];
-    while (i + 1 < body.length && (body[i + 1].trim() === '' || /^\s/.test(body[i + 1]))) {
+    while (
+      i + 1 < body.length &&
+      (body[i + 1].trim() === '' || /^\s/.test(body[i + 1]) || (!value && /^- /.test(body[i + 1])))
+    ) {
       cont.push(body[++i].trim());
     }
 

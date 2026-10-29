@@ -2,7 +2,7 @@ import { getJson, getText, HttpError } from './http.mjs';
 import { MESSAGES, scanText } from './rules.mjs';
 import { parseFrontmatter, scanFrontmatter, sanitizeDescription } from './frontmatter.mjs';
 
-export const SOURCE_RE = /^(?!\.)[\w.-]+\/(?!\.)[\w.-]+$/;
+export const SOURCE_RE = /^(?![.-])[\w.-]+\/(?![.-])[\w.-]+$/;
 const MAX_BYTES = 262144;
 const MAX_FILES = 30;
 

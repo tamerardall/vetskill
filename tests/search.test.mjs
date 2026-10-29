@@ -88,6 +88,17 @@ test('drops items with unsafe or non-string fields, keeping rank positions', asy
   assert.deepEqual(candidates.map((c) => c.id), ['o/r/good']);
   assert.equal(candidates[0].score, Math.round((1 / (10 + 7)) * 1e4) / 1e4);
 });
+test('drops fields that start with a dash', async () => {
+  const items = [
+    { ...sk('o/r/a1'), name: '--yes' },
+    { ...sk('o/r/a2'), source: '-rf/r' },
+    { ...sk('o/r/a3'), source: 'o/-r' },
+    { ...sk('o/r/a4'), skillId: '-x' },
+  ];
+  const f = fakeFetch({ q1: { body: body(items) } });
+  const { candidates } = await searchAll(['q1'], { fetch: f, apiBase: base });
+  assert.deepEqual(candidates, []);
+});
 test('drops dot-dot source', async () => {
   const f = fakeFetch({ q1: { body: body([{ ...sk('o/r/a'), source: '../..' }]) } });
   const { candidates } = await searchAll(['q1'], { fetch: f, apiBase: base });

@@ -2,7 +2,7 @@ import { getJson } from './http.mjs';
 import { SOURCE_RE } from './fetch-skill.mjs';
 
 const RRF_K = 10;
-const NAME_RE = /^[A-Za-z0-9._-]{1,100}$/;
+const NAME_RE = /^(?!-)[A-Za-z0-9._-]{1,100}$/;
 const ID_RE = /^[A-Za-z0-9._/-]{1,200}$/;
 const ok = (v, re) => typeof v === 'string' && re.test(v);
 // skills.sh fields are third-party text and end up in an install command: accept only strict shapes.

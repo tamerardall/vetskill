@@ -42,7 +42,7 @@ function parseArgs(argv) {
 const FETCH_FAILED = () => ({
   description: '',
   scannedFiles: 0,
-  findings: [{ rule: 'SS-08', severity: 'info', file: '.', line: null, message: MESSAGES['SS-08:fetch-failed'] }],
+  findings: [{ rule: 'SS-08', severity: 'info', file: '.', line: null, message: MESSAGES['SS-08:skill-fetch-failed'] }],
 });
 
 function safeToken(env, getGhToken) {

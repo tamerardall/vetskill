@@ -172,7 +172,7 @@ test('truncated tree adds SS-08', async () => {
 });
 test('other tree failure is fetch-failed', async () => {
   const r = await run(cand('o/r', 's'), { trees: { 'o/r': 500 } });
-  assert.match(r.findings[0].message, /could not fetch/);
+  assert.equal(r.findings[0].message, 'could not fetch the skill');
 });
 test('raw 429 is rate-limited for that file', async () => {
   const r = await run(cand('o/r', 'pdf'), {
@@ -256,4 +256,29 @@ test('rejects dot-dot source', async () => {
     assert.equal(r.calls.length, 0, s);
     assert.match(r.findings[0].message, /not supported/);
   }
+});
+test('raw 500 is fetch-failed for that file', async () => {
+  const r = await run(cand('o/r', 'pdf'), {
+    trees: { 'o/r': { tree: [blob('pdf/SKILL.md'), blob('pdf/a.txt')] } },
+    raw: { 'o/r/pdf/SKILL.md': CLEAN, 'o/r/pdf/a.txt': 500 },
+  });
+  const f = r.findings.filter((x) => x.rule === 'SS-08');
+  assert.deepEqual(f.map((x) => [x.file, x.message]), [['a.txt', 'could not fetch the file']]);
+});
+test('root SKILL.md is used when its name matches even with other skills present', async () => {
+  const r = await run(cand('o/r', 'whatever'), {
+    trees: { 'o/r': { tree: [blob('SKILL.md'), blob('other/SKILL.md')] } },
+    raw: { 'o/r/SKILL.md': named('whatever'), 'o/r/other/SKILL.md': named('other') },
+  });
+  assert.equal(r.description, 'd whatever');
+  assert.equal(r.scannedFiles, 2);
+});
+test('root SKILL.md of another skill is not used', async () => {
+  const r = await run(cand('o/r', 'whatever'), {
+    trees: { 'o/r': { tree: [blob('SKILL.md'), blob('other/SKILL.md')] } },
+    raw: { 'o/r/SKILL.md': named('repo-skill'), 'o/r/other/SKILL.md': named('other') },
+  });
+  assert.equal(r.scannedFiles, 0);
+  assert.equal(r.description, '');
+  assert.deepEqual(r.findings.map((f) => f.message), ['skill folder was not found']);
 });

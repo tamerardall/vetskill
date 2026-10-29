@@ -16,7 +16,9 @@ export function createTreeCache() {
 }
 
 const ss08 = (key, file) => ({ rule: 'SS-08', severity: 'info', file, line: null, message: MESSAGES[`SS-08:${key}`] });
-const failKey = (e) => (e instanceof HttpError && (e.status === 403 || e.status === 429) ? 'rate-limited' : 'fetch-failed');
+const isRateLimit = (e) => e instanceof HttpError && (e.status === 403 || e.status === 429);
+const failKey = (e) => (isRateLimit(e) ? 'rate-limited' : 'fetch-failed');
+const skillFailKey = (e) => (isRateLimit(e) ? 'rate-limited' : 'skill-fetch-failed');
 const empty = (findings) => ({ description: '', scannedFiles: 0, findings });
 
 function loadTree(source, { fetch, token, treeCache }) {
@@ -62,7 +64,17 @@ async function findSkillDir(blobs, skillId, source, fetch) {
     matches.sort((a, b) => byLengthThenPath(a.dir, b.dir));
     return matches[0];
   }
-  return blobs.some((b) => b.path === 'SKILL.md') ? { dir: '', skillMd: null } : null;
+  // Root SKILL.md: only when it is the repo's only skill, or it names this skill.
+  const root = blobs.find((b) => b.path === 'SKILL.md');
+  if (!root) return null;
+  if (all.length === 0) return { dir: '', skillMd: null };
+  if ((root.size ?? 0) > MAX_BYTES) return null;
+  try {
+    const text = await getText(fetch, rawUrl(source, 'SKILL.md'));
+    return parseFrontmatter(text).name === skillId ? { dir: '', skillMd: text } : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function vetCandidate(candidate, ctx) {
@@ -84,7 +96,7 @@ async function vetUnsanitized(candidate, { fetch, token, treeCache }) {
     truncated = res.truncated === true;
     if (!Array.isArray(tree)) throw new Error('bad tree');
   } catch (e) {
-    return empty([ss08(failKey(e), '.')]);
+    return empty([ss08(skillFailKey(e), '.')]);
   }
 
   const blobs = tree.filter((t) => t.type === 'blob');

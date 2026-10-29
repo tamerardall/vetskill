@@ -71,7 +71,7 @@ test('messages never quote input', () => {
 test('MESSAGES has all keys', () => {
   for (const k of ['SS-01', 'SS-02', 'SS-03', 'SS-04', 'SS-05', 'SS-06', 'SS-07',
     'SS-08:unsupported-source', 'SS-08:folder-not-found', 'SS-08:too-large', 'SS-08:file-limit',
-    'SS-08:binary', 'SS-08:rate-limited', 'SS-08:fetch-failed']) {
+    'SS-08:binary', 'SS-08:rate-limited', 'SS-08:fetch-failed', 'SS-08:skill-fetch-failed']) {
     assert.equal(typeof MESSAGES[k], 'string', k);
   }
 });
@@ -117,3 +117,9 @@ test('SS-03 ignores lowercase cookies URL', () =>
   assert.deepEqual(scanText('a.md', 'See https://example.com/cookies-policy'), []));
 test('SS-03 flags browser Cookies store', () =>
   only('a.py', 'p = home + "/.config/google-chrome/Chrome/Default/Cookies"', 'SS-03', 'medium'));
+
+test('SS-08 messages distinguish file and skill failures', () => {
+  assert.equal(MESSAGES['SS-08:too-large'], 'file is too large to scan');
+  assert.equal(MESSAGES['SS-08:fetch-failed'], 'could not fetch the file');
+  assert.equal(MESSAGES['SS-08:skill-fetch-failed'], 'could not fetch the skill');
+});

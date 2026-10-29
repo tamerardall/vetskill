@@ -8,11 +8,12 @@ export const MESSAGES = {
   'SS-07': 'requests unrestricted shell or tool access',
   'SS-08:unsupported-source': 'source type is not supported',
   'SS-08:folder-not-found': 'skill folder was not found',
-  'SS-08:too-large': 'skill is too large to scan',
+  'SS-08:too-large': 'file is too large to scan',
   'SS-08:file-limit': 'skill has too many files to scan',
   'SS-08:binary': 'binary file was not scanned',
   'SS-08:rate-limited': 'remote host rate-limited the request',
-  'SS-08:fetch-failed': 'could not fetch the skill',
+  'SS-08:fetch-failed': 'could not fetch the file',
+  'SS-08:skill-fetch-failed': 'could not fetch the skill',
 };
 
 // Bidi controls and Unicode tag characters: high. Zero-width and joiners: medium.

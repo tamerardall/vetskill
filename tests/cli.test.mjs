@@ -106,7 +106,7 @@ test('a throwing vetCandidate yields SS-08 for that candidate only', async () =>
   assert.equal(r.exitCode, 0);
   const cs = JSON.parse(r.stdout).candidates;
   assert.equal(cs.length, 3);
-  assert.deepEqual(cs[1].findings.map((f) => f.rule), ['SS-08']);
+  assert.deepEqual(cs[1].findings.map((f) => [f.rule, f.message]), [['SS-08', 'could not fetch the skill']]);
   assert.equal(cs[1].scannedFiles, 0);
   assert.deepEqual(Object.keys(cs[1]), Object.keys(cs[0]));
   assert.equal(cs[0].scannedFiles, 1);

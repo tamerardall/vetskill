@@ -20,10 +20,13 @@ export const HIGH_CHARS = /[\u{202A}-\u{202E}\u{2066}-\u{2069}\u{E0000}-\u{E007F
 export const MEDIUM_CHARS = /[\u{200B}-\u{200D}\u{2060}\u{FEFF}]/u;
 export const ALL_HIDDEN_CHARS = /[\u{202A}-\u{202E}\u{2066}-\u{2069}\u{E0000}-\u{E007F}\u{200B}-\u{200D}\u{2060}\u{FEFF}]/gu;
 
+// Every quantifier that scans along a line is bounded so a hostile line cannot cause catastrophic backtracking.
 const SS02 = [
-  /\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(ba|z)?sh\b/i,
-  /eval\s+["']?\$\(\s*(curl|wget)\b/i,
-  /\b(iex|invoke-expression)\b.*\b(iwr|invoke-webrequest|downloadstring)\b/i,
+  /\b(curl|wget)\b[^\n|]{0,500}\|\s{0,20}(sudo(\s+-\S+){0,5}\s+)?(ba|z)?sh\b/i,
+  /eval\s{1,20}["']?\$\(\s{0,20}(curl|wget)\b/i,
+  /\b(ba|z)?sh\s{1,20}<\(\s{0,20}(curl|wget)\b/i,
+  /\b(ba|z)?sh\s{1,20}-c\s{1,20}["']?\$\(\s{0,20}(curl|wget)\b/i,
+  /\b(iex|invoke-expression)\b.{0,500}\b(iwr|invoke-webrequest|downloadstring)\b/i,
 ];
 
 const SS03_ALL = /~\/\.ssh|id_rsa|id_ed25519|\.aws\/credentials|Login Data|cookies\.sqlite|\/Cookies|Library\/Keychains/i;
@@ -40,11 +43,21 @@ const SS05 = [
 ];
 
 const SS06 = [
-  /[A-Za-z0-9+/]{200,}={0,2}/,
   /eval\s*\(\s*atob\s*\(/i,
   /exec\s*\(\s*base64/i,
-  /base64\s+(-d|--decode)\b[^\n]*\|\s*(ba|z)?sh\b/i,
+  /base64\s{1,20}(-d|--decode)\b[^\n]{0,500}\|\s{0,20}(ba|z)?sh\b/i,
 ];
+
+const B64 = /[A-Za-z0-9+/]/;
+// Linear scan for a run of 200+ base64 characters (a regex here is O(n * 200) on hostile lines).
+function hasLongBase64(line) {
+  let run = 0;
+  for (let i = 0; i < line.length; i++) {
+    run = B64.test(line[i]) ? run + 1 : 0;
+    if (run >= 200) return true;
+  }
+  return false;
+}
 
 function hasPublicIpUrl(line) {
   for (const m of line.matchAll(IP_URL)) {
@@ -53,6 +66,9 @@ function hasPublicIpUrl(line) {
   }
   return false;
 }
+
+// Lines longer than this (minified bundles, hostile input) skip the pattern rules; SS-01, SS-03 and long base64 still run.
+const MAX_PATTERN_LINE = 4096;
 
 export function scanText(path, text) {
   const findings = [];
@@ -68,11 +84,12 @@ export function scanText(path, text) {
     if (HIGH_CHARS.test(line)) add('SS-01', 'high', n);
     else if (MEDIUM_CHARS.test(line)) add('SS-01', 'medium', n);
 
-    if (SS02.some((re) => re.test(line))) add('SS-02', 'high', n);
+    const long = line.length > MAX_PATTERN_LINE;
+    if (!long && SS02.some((re) => re.test(line))) add('SS-02', 'high', n);
     if (SS03_ALL.test(line) || (!isMarkdown && SS03_ENV.test(line))) add('SS-03', 'medium', n);
-    if (hasPublicIpUrl(line) || SS04_HOSTS.test(line)) add('SS-04', 'medium', n);
-    if (SS05.some((re) => re.test(line))) add('SS-05', 'medium', n);
-    if (SS06.some((re) => re.test(line))) add('SS-06', 'medium', n);
+    if (!long && (hasPublicIpUrl(line) || SS04_HOSTS.test(line))) add('SS-04', 'medium', n);
+    if (!long && SS05.some((re) => re.test(line))) add('SS-05', 'medium', n);
+    if (hasLongBase64(line) || (!long && SS06.some((re) => re.test(line)))) add('SS-06', 'medium', n);
   });
 
   return findings;

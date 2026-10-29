@@ -250,3 +250,10 @@ test('hostile file path is sanitized in findings', async () => {
   assert.ok(files.includes('s?h.sh'), JSON.stringify(files));
   for (const f of files) assert.match(f, /^[A-Za-z0-9._/@+ ?-]{1,200}$/);
 });
+test('rejects dot-dot source', async () => {
+  for (const s of ['../..', 'o/..', '.git/x']) {
+    const r = await run(cand(s, 'x'), {});
+    assert.equal(r.calls.length, 0, s);
+    assert.match(r.findings[0].message, /not supported/);
+  }
+});

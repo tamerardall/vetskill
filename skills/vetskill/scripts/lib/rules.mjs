@@ -29,17 +29,19 @@ const SS02 = [
   /\b(iex|invoke-expression)\b.{0,500}\b(iwr|invoke-webrequest|downloadstring)\b/i,
 ];
 
-const SS03_ALL = /~\/\.ssh|id_rsa|id_ed25519|\.aws\/credentials|Login Data|cookies\.sqlite|\/Cookies|Library\/Keychains/i;
+const SS03_ALL = /~\/\.ssh|id_rsa|id_ed25519|\.aws\/credentials|Login Data|cookies\.sqlite|Library\/Keychains/i;
+// Chromium's cookie store file; case-sensitive so "/cookies-policy" URLs do not match.
+const SS03_COOKIES = /\/Cookies\b/;
 const SS03_ENV = /(^|[\s'"`/(])\.env\b/i;
 
 const IP_URL = /https?:\/\/(\d{1,3}\.){3}\d{1,3}/gi;
 const SS04_HOSTS = /webhook\.site|ngrok\.io|ngrok-free\.app|pastebin\.com|discord\.com\/api\/webhooks|discordapp\.com\/api\/webhooks|requestbin|pipedream\.net/i;
 
 const SS05 = [
-  /ignore (all )?(the )?previous instructions/i,
-  /disregard (the |your )?(system prompt|previous instructions)/i,
-  /do not tell the user/i,
-  /without (asking|telling) the user/i,
+  /ignore\s+(all\s+)?(the\s+)?(previous|prior|above)\s+instructions/i,
+  /disregard\s+(the\s+|your\s+)?(system\s+prompt|(previous|prior|above)\s+instructions)/i,
+  /do\s+not\s+tell\s+the\s+user/i,
+  /without\s+(asking|telling)\s+the\s+user/i,
 ];
 
 const SS06 = [
@@ -86,7 +88,7 @@ export function scanText(path, text) {
 
     const long = line.length > MAX_PATTERN_LINE;
     if (!long && SS02.some((re) => re.test(line))) add('SS-02', 'high', n);
-    if (SS03_ALL.test(line) || (!isMarkdown && SS03_ENV.test(line))) add('SS-03', 'medium', n);
+    if (SS03_ALL.test(line) || SS03_COOKIES.test(line) || (!isMarkdown && SS03_ENV.test(line))) add('SS-03', 'medium', n);
     if (!long && (hasPublicIpUrl(line) || SS04_HOSTS.test(line))) add('SS-04', 'medium', n);
     if (!long && SS05.some((re) => re.test(line))) add('SS-05', 'medium', n);
     if (hasLongBase64(line) || (!long && SS06.some((re) => re.test(line)))) add('SS-06', 'medium', n);

@@ -88,3 +88,8 @@ test('drops items with unsafe or non-string fields, keeping rank positions', asy
   assert.deepEqual(candidates.map((c) => c.id), ['o/r/good']);
   assert.equal(candidates[0].score, Math.round((1 / (10 + 7)) * 1e4) / 1e4);
 });
+test('drops dot-dot source', async () => {
+  const f = fakeFetch({ q1: { body: body([{ ...sk('o/r/a'), source: '../..' }]) } });
+  const { candidates } = await searchAll(['q1'], { fetch: f, apiBase: base });
+  assert.deepEqual(candidates, []);
+});

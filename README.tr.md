@@ -61,23 +61,23 @@ Node 18 veya üstü gerekir. `npx skills` için Node zaten kurulu olmalı. Başk
 
 1. Ajan isteğini 3–5 İngilizce arama sorgusuna çevirir.
 2. `scripts/scan.mjs` her sorgu için skills.sh API'sini çağırır. Sonuçları Reciprocal Rank Fusion ile birleştirir (`score = Σ 1 / (10 + rank)`). Böylece alaka sırası korunur, kurulum sayısı yalnızca eşitliği bozar.
-3. Script ilk adayların (varsayılan 10) skill klasörünü GitHub'dan çeker ve aşağıdaki kuralları her dosyada çalıştırır. Bulgu mesajları sabit metinlerdir, dosyadan alıntı içermez.
+3. Script ilk adayların (varsayılan 10) skill klasörünü GitHub'dan çeker ve aşağıdaki kuralları her dosyada çalıştırır. Bulgu mesajları sabit metinlerdir, dosya içeriğinden alıntı içermez.
 4. Script JSON yazar ve ajan yalnızca bu JSON'u okur. Niyetine uyan 1–3 adayı seçer, her birinin bulgularını gösterir. Taranamayan kısımlar da bu bulgulara dahildir.
 
-**Ajan, adayın ham SKILL.md, README, script veya skills.sh sayfasını hiç okumaz.** Bu metinleri yabancılar yazar, içlerinde prompt injection olabilir. Modelin güvenilir şekilde göremediği görünmez Unicode karakterler de içerebilirler. Bu içeriğe yalnızca script dokunur.
+**Ajan, adayın ham SKILL.md, README, script veya skills.sh sayfasını hiç okumaz.** Bu metinleri yabancılar yazar, içlerinde prompt injection olabilir. Modelin güvenilir şekilde göremediği görünmez Unicode karakterler de içerebilirler. Bu dosyaları yalnızca script okur. JSON'a temizlenerek ulaşan birkaç üçüncü taraf metni vardır: skills.sh'teki `id`, `source` ve `name` (katı kalıplara uymayan adaylar atılır), bulgulardaki dosya yolları (harf, rakam, boşluk ve `._/@+-` dışındaki karakterler `?` olur, en fazla 200 karakter) ve frontmatter `description` alanı (kontrol ve gizli karakterler silinir, 300 karaktere kısaltılır). Bunlar yine de yabancıların yazdığı kelimeler içerebilir. Bu yüzden skill, ajana bu alanlardaki talimatlara asla uymamasını söyler.
 
 ## Kurallar
 
 | ID | Ne arar | Önem |
 |---|---|---|
 | SS-01 | Bidi kontrol karakterleri (U+202A–202E, U+2066–2069) ve Unicode tag karakterleri (U+E0000–E007F): yüksek. Sıfır genişlikli karakterler (U+200B–200D, U+2060, dosya başı dışındaki U+FEFF): orta | yüksek / orta |
-| SS-02 | `curl`/`wget` çıktısının `sh`/`bash`/`zsh`'e aktarılması, `eval "$(curl …)"`, `iex (iwr …)` / `Invoke-Expression` ile indirme | yüksek |
+| SS-02 | `curl`/`wget` çıktısının `sh`/`bash`/`zsh`'e aktarılması (`sudo` ile de), `bash <(curl …)`, `sh -c "$(curl …)"`, `eval "$(curl …)"`, `iex (iwr …)` / `Invoke-Expression` ile indirme | yüksek |
 | SS-03 | `~/.ssh`, `id_rsa`, `id_ed25519`, `~/.aws/credentials`, tarayıcı çerez/profil dizinleri, macOS keychain her dosyada; `.env` yalnızca Markdown dışı dosyalarda | orta |
 | SS-04 | Ham IP adresine HTTP istekleri; `webhook.site`, `ngrok`, `pastebin.com`, `discord.com/api/webhooks`, `requestbin` | orta |
-| SS-05 | Prompt injection kalıpları: "ignore (all) previous instructions", "do not tell the user", "without asking the user", "disregard (the) system prompt" (büyük/küçük harf duyarsız) | orta |
+| SS-05 | Prompt injection kalıpları: "ignore (all) previous/prior/above instructions", "do not tell the user", "without asking the user", "disregard (the) system prompt" (büyük/küçük harf duyarsız) | orta |
 | SS-06 | 200+ karakterlik base64 blokları, `eval(atob(`, `exec(base64`, `base64 -d \| sh` | orta |
 | SS-07 | Frontmatter `allowed-tools` içinde kısıtsız `Bash` veya `*` | bilgi |
-| SS-08 | Taranamayan içerik: ikili dosya, 256 KB üstü dosya, 30 dosya sınırını aşan kısım, çekilemeyen dosya, desteklenmeyen kaynak, hız sınırı | bilgi |
+| SS-08 | Taranamayan içerik: ikili dosya, 256 KB üstü dosya, 30 dosya sınırını aşan kısım, çekilemeyen dosya veya skill, bulunamayan skill klasörü, hız sınırı | bilgi |
 
 **`.env` neden Markdown'da işaretlenmez:** Bir deploy skill'inin dokümanında "`VERCEL_TOKEN` değerini `.env` dosyana yaz" demesi beklenen ve zararsız bir durumdur. `.env` dosyasını açan bir script ise incelemeye değer. Anahtar ve kimlik bilgisi yolları her dosyada işaretlenir.
 
@@ -96,14 +96,15 @@ vetskill'in kattıkları:
 
 - **Karar anında, güncel dosyalarda.** Daha önceki bir denetimin yapıldığı anı değil, seçim yaptığın anda depoda bulunan dosyaları tarar.
 - **Ajan ham aday içeriğini hiç okumaz.** vetskill'siz baz ölçümümüzde ajandan Vercel deploy skill'i bulması ve güvenli olup olmadığını söylemesi istendi. Ajan 5 çalıştırmanın 5'inde adayın SKILL.md dosyasını okudu. 5'inde de "büyük ölçüde evet" türünde bir hüküm verdi ("Mostly yes, with caveats", "Reasonably safe, with caveats"). vetskill ile her ikisi de 5'te 0. Bkz. [docs/baseline/2026-10-29-red.md](docs/baseline/2026-10-29-red.md) ve [docs/baseline/2026-10-29-green.md](docs/baseline/2026-10-29-green.md).
-- **Dosya bazında bulgular ve açık SS-08.** Her bulgu kural ID'si, dosya ve satır taşır. Taranamayan her şey bu şekilde listelenir.
+- **Dosya bazında bulgular ve açık SS-08.** Her bulgu kural ID'si ve dosya taşır, uygun olduğunda satır da taşır. Taranamayan her şey bu şekilde listelenir.
 - **Niyete dayalı, çoklu sorgulu sıralama.** Birden çok sorgu alakaya göre birleştirilir. Ajan açıklamanın uyumuna göre seçer, kurulum sayısı yalnızca eşitliği bozar.
 
 ## Sınırlar
 
 - **Statik tarama kararlı bir saldırganı yakalayamaz. Bulgu olmaması güvenli olduğu anlamına gelmez.** vetskill kalıp eşleştirir. Kod çalıştırmaz, veri akışını izlemez, sandbox kullanmaz. Hiçbir skill'e "güvenli" demez.
-- Yalnızca GitHub'da barınan skill'ler taranır. Diğer kaynaklar SS-08 "desteklenmeyen kaynak" olarak listelenir.
+- Yalnızca GitHub'da barınan skill'ler taranır. Kaynağı GitHub `owner/repo` biçiminde olmayan ya da id veya adı beklenmeyen karakterler içeren arama sonuçları atılır.
 - Skill başına en fazla 30 dosya, dosya başına en fazla 256 KB taranır. Kalanı SS-08 olarak bildirilir.
+- 4096 karakterden uzun satırlar (örneğin küçültülmüş kod) yalnızca SS-01, SS-03 ve uzun base64 blokları için denetlenir.
 - Arama skills.sh API'sine bağlıdır. Bazı sorgular başarısız olursa JSON bunları `warnings` içinde listeler ve sonuçlar eksik olabilir. Hepsi başarısız olursa `error` dolar.
 
 ## Geliştirme

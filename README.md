@@ -61,23 +61,23 @@ Optional: run `gh auth login` (or set `GITHUB_TOKEN`). Without a token, GitHub a
 
 1. The agent turns your request into 3–5 English search queries.
 2. `scripts/scan.mjs` queries the skills.sh API for each one. It merges the results with Reciprocal Rank Fusion (`score = Σ 1 / (10 + rank)`), so relevance order is kept and installs only break ties.
-3. For the top candidates (10 by default), the script fetches the skill folder from GitHub and runs the rules below on every file. Finding messages are fixed strings and never quote the file.
+3. For the top candidates (10 by default), the script fetches the skill folder from GitHub and runs the rules below on every file. Finding messages are fixed strings and never quote file content.
 4. The script prints JSON. The agent reads only that JSON. It picks 1–3 candidates that fit your intent and shows each one's findings, including what could not be scanned.
 
-**The agent never reads a candidate's raw SKILL.md, README, scripts or skills.sh page.** That text is written by strangers and can carry a prompt injection. It can also contain invisible Unicode that a model cannot reliably see. Only the script touches it.
+**The agent never reads a candidate's raw SKILL.md, README, scripts or skills.sh page.** That text is written by strangers and can carry a prompt injection. It can also contain invisible Unicode that a model cannot reliably see. Only the script reads those files. A few third-party strings do reach the JSON, cleaned first: the skills.sh `id`, `source` and `name` (candidates whose values do not match strict patterns are dropped), file paths in findings (characters outside letters, digits, spaces and `._/@+-` become `?`, capped at 200 characters), and the frontmatter `description` (control and hidden characters removed, cut to 300 characters). They can still contain words written by strangers, so the skill tells the agent never to follow instructions in them.
 
 ## Rules
 
 | ID | Looks for | Severity |
 |---|---|---|
 | SS-01 | Bidi controls (U+202A–202E, U+2066–2069) and Unicode tag characters (U+E0000–E007F): high. Zero-width characters (U+200B–200D, U+2060, U+FEFF except at file start): medium | high / medium |
-| SS-02 | `curl`/`wget` piped into `sh`/`bash`/`zsh`, `eval "$(curl …)"`, `iex (iwr …)` / `Invoke-Expression` with a download | high |
+| SS-02 | `curl`/`wget` piped into `sh`/`bash`/`zsh` (also via `sudo`), `bash <(curl …)`, `sh -c "$(curl …)"`, `eval "$(curl …)"`, `iex (iwr …)` / `Invoke-Expression` with a download | high |
 | SS-03 | `~/.ssh`, `id_rsa`, `id_ed25519`, `~/.aws/credentials`, browser cookie/profile stores, macOS keychain in every file; `.env` in non-Markdown files only | medium |
 | SS-04 | HTTP requests to raw IP addresses; `webhook.site`, `ngrok`, `pastebin.com`, `discord.com/api/webhooks`, `requestbin` | medium |
-| SS-05 | Prompt-injection phrases: "ignore (all) previous instructions", "do not tell the user", "without asking the user", "disregard (the) system prompt" (case-insensitive) | medium |
+| SS-05 | Prompt-injection phrases: "ignore (all) previous/prior/above instructions", "do not tell the user", "without asking the user", "disregard (the) system prompt" (case-insensitive) | medium |
 | SS-06 | Base64 blocks of 200+ characters, `eval(atob(`, `exec(base64`, `base64 -d \| sh` | medium |
 | SS-07 | Unrestricted `Bash` or `*` in frontmatter `allowed-tools` | info |
-| SS-08 | Content that was not scanned: binary file, file over 256 KB, files beyond the 30-file limit, file that could not be fetched, unsupported source, rate limit | info |
+| SS-08 | Content that was not scanned: binary file, file over 256 KB, files beyond the 30-file limit, file or skill that could not be fetched, skill folder not found, rate limit | info |
 
 **Why `.env` is Markdown-exempt:** a deploy skill's docs saying "set `VERCEL_TOKEN` in your `.env` file" is expected and harmless. A script that opens `.env` is worth a look. Key and credential paths are flagged everywhere.
 
@@ -96,14 +96,15 @@ What vetskill adds:
 
 - **Decision time, current files.** It scans what is in the repo at the moment you are choosing, not at the time of an earlier audit.
 - **The agent never reads raw candidate content.** In our baseline without vetskill, an agent asked to find a Vercel deploy skill and check its safety read the candidate's SKILL.md in 5 of 5 runs. It answered "mostly yes"-style in 5 of 5 ("Mostly yes, with caveats", "Reasonably safe, with caveats"). With vetskill: 0 of 5 for both. See [docs/baseline/2026-10-29-red.md](docs/baseline/2026-10-29-red.md) and [docs/baseline/2026-10-29-green.md](docs/baseline/2026-10-29-green.md).
-- **Per-file findings plus explicit SS-08.** Every finding has a rule ID, file and line, and anything that was not scanned is listed as such.
+- **Per-file findings plus explicit SS-08.** Every finding has a rule ID and a file, plus a line where one applies, and anything that was not scanned is listed as such.
 - **Intent-based, multi-query ranking.** Several queries are merged by relevance. The agent picks by description fit, and installs are a tie-breaker only.
 
 ## Limits
 
 - **Static scanning cannot catch a determined attacker. No findings ≠ safe.** vetskill matches patterns. It does not execute code, follow data flow or sandbox anything. It never calls a skill safe.
-- Only GitHub-hosted skills are scanned. Other sources are listed as SS-08 "unsupported source".
+- Only GitHub-hosted skills are scanned. Search results whose source is not a GitHub `owner/repo`, or whose id or name contain unexpected characters, are dropped.
 - Per skill, at most 30 files of up to 256 KB each are scanned. The rest is reported as SS-08.
+- Lines longer than 4096 characters (minified code, for example) are checked only for SS-01, SS-03 and long base64 blocks.
 - Search depends on the skills.sh API. If some queries fail, the JSON lists them in `warnings` and results may be incomplete. If all fail, `error` is set.
 
 ## Development

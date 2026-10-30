@@ -34,7 +34,7 @@ For each recommendation, in this order:
 1. **Name, source, installs** — e.g. `deploy-to-vercel` · `vercel-labs/agent-skills` · `<installs>` installs.
 2. **Why it fits** — 1–2 sentences tying `description` to the user's request.
 3. **Findings** — one line per non-SS-08 finding: `severity · rule · file:line · your interpretation`. With none, write "No findings in scanned files". Then one line per SS-08 finding: `SS-08 · file · not scanned: message`.
-4. **Install command** — `npx skills add <source>@<name>`.
+4. **Install command** — `cd ~ && npx skills add <source>@<name> -g`. Always give `-g` (global, `~/`) and start from `~`: without `-g` the CLI installs into the current directory, which would be this skill's own folder. If the user wants one agent only, add `-a <agent>` (e.g. `-a claude-code`).
 
 ## When the script reports problems
 

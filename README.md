@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="96" alt="vetskill logo"></p>
+
 # vetskill
 
 **English** · [Türkçe](README.tr.md)

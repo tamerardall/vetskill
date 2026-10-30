@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 44 44" role="img" aria-label="vetskill">
+  <rect width="44" height="44" rx="11" fill="#1e1f23"/>
+  <path d="M12 17v-5h5M32 17v-5h-5M12 27v5h5M32 27v5h-5" fill="none" stroke="#e8e6e1" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 22h16" stroke="#6cc08b" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

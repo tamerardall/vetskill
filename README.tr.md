@@ -53,7 +53,14 @@ Ajan bunu şöyle sunar:
 npx skills add tamerardall/vetskill
 ```
 
-Node 18 veya üstü gerekir. `npx skills` için Node zaten kurulu olmalı. Başka bağımlılık yok.
+Ya da Claude Code'da plugin olarak kur:
+
+```
+/plugin marketplace add tamerardall/vetskill
+/plugin install vetskill@vetskill
+```
+
+Node 18 veya üstü gerekir. Başka bağımlılık yok.
 
 İsteğe bağlı: `gh auth login` çalıştır (ya da `GITHUB_TOKEN` tanımla). Token olmadan GitHub saatte 60 API isteğine izin verir. Bu sınıra takılan adaylar taranmaz, SS-08 "hız sınırı" bulgusuyla gösterilir.
 

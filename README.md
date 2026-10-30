@@ -53,7 +53,14 @@ The agent turns this into:
 npx skills add tamerardall/vetskill
 ```
 
-Requires Node 18 or later. You already need Node for `npx skills`. There are no other dependencies.
+Or, in Claude Code, install it as a plugin:
+
+```
+/plugin marketplace add tamerardall/vetskill
+/plugin install vetskill@vetskill
+```
+
+Requires Node 18 or later. There are no other dependencies.
 
 Optional: run `gh auth login` (or set `GITHUB_TOKEN`). Without a token, GitHub allows 60 API requests per hour. Candidates hit by that limit show up as SS-08 "rate-limited" instead of being scanned.
 

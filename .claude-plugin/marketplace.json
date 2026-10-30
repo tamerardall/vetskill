@@ -1,0 +1,24 @@
+{
+  "name": "vetskill",
+  "id": "vetskill",
+  "owner": {
+    "name": "Tamer Ardal"
+  },
+  "metadata": {
+    "description": "Find agent skills and vet them before install",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "vetskill",
+      "source": "./",
+      "description": "Multi-query skills.sh search plus a static scan (rules SS-01..SS-08) so the agent never reads raw third-party skill content",
+      "version": "0.1.0",
+      "author": {
+        "name": "Tamer Ardal"
+      },
+      "keywords": ["skills", "skill-search", "security"],
+      "category": "security"
+    }
+  ]
+}

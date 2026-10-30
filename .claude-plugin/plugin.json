@@ -1,0 +1,13 @@
+{
+  "name": "vetskill",
+  "description": "Find the right agent skill on skills.sh and see static-scan findings before you install it",
+  "version": "0.1.0",
+  "author": {
+    "name": "Tamer Ardal"
+  },
+  "license": "MIT",
+  "keywords": ["skills", "skill-search", "security", "static-analysis", "prompt-injection"],
+  "skills": [
+    "./skills/vetskill"
+  ]
+}

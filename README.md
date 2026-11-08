@@ -8,13 +8,13 @@ Find the right skill, see what it does before you install it.
 
 vetskill is an agent skill. Describe what you need in plain words, in any language ("I want to merge PDF files"). It searches [skills.sh](https://skills.sh), ranks candidates by how well they fit your intent, and runs a static scan over each candidate's files. You get 1–3 recommendations, each with its findings and the install command. vetskill never installs anything. You decide, and you run the command yourself.
 
-## Before / after
+## Example
 
-Query: `deploy` (measured 2026-10-29).
+Query: `deploy`.
 
-**`npx skills find deploy`:** `deploy-to-vercel` is the skills.sh API's first result, but it comes in at **#17 of 20**. The CLI re-sorts the API's relevance order by install count, so its first result (`microsoft-foundry`) does not even contain the word "deploy". Upstream discussion: [vercel-labs/skills#2432](https://github.com/vercel-labs/skills/pull/2432).
+**`npx skills find deploy`** only lists matches. It does not read the skills' files, so it cannot tell you what a candidate contains. (Up to `skills` 1.7.4 it also re-sorted the API's relevance order by install count, which pushed `deploy-to-vercel` to #17 of 20. That was fixed in 1.7.5, [vercel-labs/skills#2432](https://github.com/vercel-labs/skills/pull/2432).)
 
-**vetskill:** `deploy-to-vercel` is the first recommendation. Trimmed excerpt of `node skills/vetskill/scripts/scan.mjs --query deploy --query "deploy vercel" --top 5`:
+**vetskill** recommends `deploy-to-vercel` first and scans its files. Trimmed excerpt of `node skills/vetskill/scripts/scan.mjs --query deploy --query "deploy vercel" --top 5`:
 
 ```json
 {
@@ -96,7 +96,7 @@ A finding is a pointer to a line, not a verdict. A static match can be entirely 
 
 | Tool | What it does | How vetskill differs |
 |---|---|---|
-| `npx skills find` | Searches skills.sh | Re-sorts results by installs, so the best match can drop far down (#17 of 20 for `deploy`). Shows names only, without descriptions. |
+| `npx skills find` | Searches skills.sh | Lists matches only. It does not scan or read the files, so you see no findings before you install. |
 | `maverickemanuel/trusted-skill-scout` | Searches with `npx skills find` and installs | "Trust" means ≥100 installs and ≥500 stars. It does not scan content and ranks by popularity. |
 | `affaan-m/ecc` → `skill-scout` | Looks for an existing skill before you write a new one | Different goal. No deterministic scan. |
 | skills.sh audit badges (Gen Agent Trust Hub, Socket, Snyk) | Third-party audits shown on the skills.sh page | Useful information, and vetskill does not replace them. |

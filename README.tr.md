@@ -8,13 +8,13 @@ Doğru skill'i bul, kurmadan önce ne yaptığını gör.
 
 vetskill bir ajan skill'idir. İhtiyacını herhangi bir dilde, düz cümleyle anlatırsın ("PDF dosyalarını birleştirmek istiyorum"). vetskill [skills.sh](https://skills.sh) üzerinde arama yapar, adayları niyetine ne kadar uyduklarına göre sıralar ve her adayın dosyalarını statik olarak tarar. 1–3 öneri alırsın. Her önerinin yanında bulguları ve kurulum komutu yer alır. vetskill hiçbir şey kurmaz. Kararı sen verirsin, komutu da sen çalıştırırsın.
 
-## Önce / sonra
+## Örnek
 
-Sorgu: `deploy` (2026-10-29'da ölçüldü).
+Sorgu: `deploy`.
 
-**`npx skills find deploy`:** `deploy-to-vercel` skills.sh API'sinin ilk sonucudur, ama CLI çıktısında **20 sonuç içinde 17. sıraya** düşer. CLI, API'nin alaka sırasını kurulum sayısına göre yeniden sıralar. Bu yüzden CLI'ın ilk sonucu (`microsoft-foundry`) "deploy" kelimesini içermez bile. Upstream tartışması: [vercel-labs/skills#2432](https://github.com/vercel-labs/skills/pull/2432).
+**`npx skills find deploy`** yalnızca eşleşmeleri listeler. Skill'lerin dosyalarını okumaz, bu yüzden bir adayın içinde ne olduğunu söyleyemez. (`skills` 1.7.4'e kadar API'nin alaka sırasını kurulum sayısına göre yeniden sıralıyordu ve `deploy-to-vercel` 20 sonuç içinde 17. sıraya düşüyordu. Bu 1.7.5'te düzeltildi: [vercel-labs/skills#2432](https://github.com/vercel-labs/skills/pull/2432).)
 
-**vetskill:** İlk öneri `deploy-to-vercel` olur. Aşağıda `node skills/vetskill/scripts/scan.mjs --query deploy --query "deploy vercel" --top 5` çıktısından kısaltılmış bir bölüm var:
+**vetskill** önce `deploy-to-vercel` önerir ve dosyalarını tarar. Aşağıda `node skills/vetskill/scripts/scan.mjs --query deploy --query "deploy vercel" --top 5` çıktısından kısaltılmış bir bölüm var:
 
 ```json
 {
@@ -96,7 +96,7 @@ Bulgu bir hüküm değildir, bir satırı gösterir. Statik bir eşleşme tamame
 
 | Araç | Ne yapar | vetskill'den farkı |
 |---|---|---|
-| `npx skills find` | skills.sh'te arar | Sonuçları kurulum sayısına göre yeniden sıralar, en uygun sonuç çok aşağı düşebilir (`deploy` için 20 sonuç içinde 17.). Açıklama göstermez, yalnızca isim gösterir. |
+| `npx skills find` | skills.sh'te arar | Yalnızca eşleşmeleri listeler. Dosyaları taramaz ya da okumaz, bu yüzden kurmadan önce bulgu göremezsin. |
 | `maverickemanuel/trusted-skill-scout` | `npx skills find` ile arar ve kurar | "Güven" ≥100 kurulum ve ≥500 yıldız demektir. İçerik taranmaz, popülerliğe göre sıralar. |
 | `affaan-m/ecc` → `skill-scout` | Yeni skill yazmadan önce benzerini arar | Amacı farklı. Deterministik tarama yok. |
 | skills.sh denetim rozetleri (Gen Agent Trust Hub, Socket, Snyk) | skills.sh sayfasında gösterilen üçüncü taraf denetimleri | Faydalı bilgilerdir, vetskill onların yerini almaz. |
